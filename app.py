@@ -40,12 +40,13 @@ def isa_atmosphere(alt_ft: float) -> tuple[float, float]:
     return T, P
 
 # ── Cycle computations ────────────────────────────────────────────────────────
-def compute_otto(r, gamma, T1, P1):
+def compute_otto(r, gamma, T1, P1, T3_max=2500.0):
     cv, cp = 718.0, 718.0 * gamma
     R_air = cp - cv
     T2 = T1 * r ** (gamma - 1);  P2 = P1 * r ** gamma
-    qin = 1800.0                  # kJ/kg — fixed heat addition
-    T3 = T2 + qin * 1e3 / cv;    P3 = P2 * T3 / T2
+    T3 = T3_max                   # fixed peak temp (materials/knock limit)
+    qin = cv * (T3 - T2) / 1e3   # heat addition varies with inlet conditions
+    P3 = P2 * T3 / T2
     T4 = T3 / r ** (gamma - 1);  P4 = P3 / r ** gamma
     qout = cv * (T4 - T1) / 1e3
     wnet = qin - qout
@@ -77,11 +78,14 @@ def compute_otto(r, gamma, T1, P1):
                 phases=['1→2 Compress','2→3 Heat Add','3→4 Expand','4→1 Heat Rej'])
 
 
-def compute_diesel(r, rc, gamma, T1, P1):
+def compute_diesel(r, rc, gamma, T1, P1, T3_max=2500.0):
     cv, cp = 718.0, 718.0 * gamma
     R_air = cp - cv
     T2 = T1 * r ** (gamma - 1);      P2 = P1 * r ** gamma
-    T3 = T2 * rc;                     P3 = P2
+    T3 = T3_max                        # fixed peak temp
+    rc = T3 / T2                       # cutoff ratio now derived from T3 and T2
+    rc = max(rc, 1.001)                # guard against rc < 1 at very high compression
+    P3 = P2
     T4 = T3 * (rc / r) ** (gamma - 1); P4 = P3 * (rc / r) ** gamma
     qin  = cp * (T3 - T2) / 1e3
     qout = cv * (T4 - T1) / 1e3
@@ -108,11 +112,12 @@ def compute_diesel(r, rc, gamma, T1, P1):
                 phases=['1→2 Compress','2→3 Heat Add','3→4 Expand','4→1 Heat Rej'])
 
 
-def compute_brayton(pr, gamma, T1, P1):
+def compute_brayton(pr, gamma, T1, P1, T3_max=1600.0):
     cp = 1005.0;  cv = cp / gamma;  R_air = cp - cv
     T2 = T1 * pr ** ((gamma - 1) / gamma);  P2 = P1 * pr
-    qin = 1200.0
-    T3 = T2 + qin * 1e3 / cp;               P3 = P2
+    T3 = T3_max                              # fixed turbine inlet temp limit
+    qin = cp * (T3 - T2) / 1e3              # varies with compressor exit temp
+    P3 = P2
     T4 = T3 / pr ** ((gamma - 1) / gamma);  P4 = P1
     qout = cp * (T4 - T1) / 1e3
     wnet = qin - qout
@@ -146,10 +151,12 @@ def compute_brayton(pr, gamma, T1, P1):
                 phases=['1→2 Compress','2→3 Heat Add','3→4 Expand','4→1 Heat Rej'])
 
 
-def compute_cycle(cycle, r, rc, pr, gamma, T1, P1):
-    if cycle == 'Otto':   return compute_otto(r, gamma, T1, P1)
-    if cycle == 'Diesel': return compute_diesel(r, rc, gamma, T1, P1)
-    return compute_brayton(pr, gamma, T1, P1)
+def compute_cycle(cycle, r, rc, pr, gamma, T1, P1, T3_max=None):
+    if cycle == 'Otto':
+        return compute_otto(r, gamma, T1, P1, T3_max or 2500.0)
+    if cycle == 'Diesel':
+        return compute_diesel(r, rc, gamma, T1, P1, T3_max or 2500.0)
+    return compute_brayton(pr, gamma, T1, P1, T3_max or 1600.0)
 
 
 def ts_traces(res, gamma):
@@ -271,7 +278,7 @@ def energy_figure(res, sl=None, show_ref=False):
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## ⚙️ Engine Cycle Simulator")
-    st.markdown("*1D Thermodynamic Analysis*")
+    st.markdown("*1D Thermodynamic Analysis · UAV Propulsion Design*")
     st.divider()
 
     cycle = st.radio("Cycle", ['Otto', 'Diesel', 'Brayton'], horizontal=True)
@@ -316,14 +323,23 @@ with st.sidebar:
         P1 = st.slider("P₁ Inlet Press (kPa)", 10.0, 200.0, 101.3, 1.0)
 
     gamma = st.slider("γ (Cp/Cv)", 1.30, 1.67, 1.40, 0.01)
+
+    st.divider()
+    st.markdown("**Peak Temperature Limit (T₃)**")
+    if cycle == 'Brayton':
+        T3_max = st.slider("T₃ max — turbine inlet limit (K)", 800, 2000, 1600, 50)
+        st.caption("Represents turbine blade material limit. T₃ is fixed; Q_in varies with altitude.")
+    else:
+        T3_max = st.slider("T₃ max — knock/materials limit (K)", 1500, 3500, 2500, 50)
+        st.caption("Represents knock or materials limit. T₃ is fixed; Q_in varies with altitude.")
     st.divider()
     st.markdown("*Sea-level reference traces appear on P-V and T-S diagrams when altitude > 500 ft.*")
 
 # ── Compute ───────────────────────────────────────────────────────────────────
 show_ref = alt > 500
 SL_T, SL_P = isa_atmosphere(0)
-res = compute_cycle(cycle, r, rc, pr, gamma, T1, P1)
-sl  = compute_cycle(cycle, r, rc, pr, gamma, SL_T, SL_P)
+res = compute_cycle(cycle, r, rc, pr, gamma, T1, P1, T3_max)
+sl  = compute_cycle(cycle, r, rc, pr, gamma, SL_T, SL_P, T3_max)
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.title("Engine Cycle Thermodynamic Simulator")
@@ -361,7 +377,7 @@ with col4:
 st.divider()
 st.markdown(
     "<small>Ideal cycle analysis · ISA atmosphere model · "
-    "Fixed heat addition: Otto/Diesel = 1800 kJ/kg, Brayton = 1200 kJ/kg · "
+    "Fixed peak temperature T₃ (materials/knock limit) — Q_in varies with altitude · "
     "Built with Streamlit + Plotly</small>",
     unsafe_allow_html=True
 )
