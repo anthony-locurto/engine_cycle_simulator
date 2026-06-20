@@ -1,6 +1,6 @@
 # Engine Cycle Thermodynamic Simulator
 
-An interactive 1D thermodynamic cycle simulator for undergraduate-level education and UAV propulsion design exploration. Built with Streamlit and Plotly.
+An interactive 1D thermodynamic cycle simulator for undergraduate-level education and aircraft propulsion design exploration. Built with Streamlit and Plotly.
 
 ## Features
 
@@ -27,12 +27,10 @@ streamlit run app.py
 
 ## Physics Notes
 
-All cycles use ideal gas assumptions with fixed heat addition:
-- Otto / Diesel: q_in = 1800 kJ/kg
-- Brayton: q_in = 1200 kJ/kg
+All cycles use ideal gas assumptions with fixed peak temperature based on knock/material limitation.
 
 Atmosphere uses the ISA standard day model (troposphere + lower stratosphere).
 
 ## Context
 
-Originally developed to explore small-scale engine design constraints for Group 2 UAV long-endurance missions at altitude, with particular focus on how inlet conditions affect cycle performance and BSFC.
+Originally developed to explore small-scale engine design constraints for aircraft at altitude, with particular focus on how inlet conditions affect cycle performance and BSFC.
