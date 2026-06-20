@@ -160,17 +160,30 @@ def compute_cycle(cycle, r, rc, pr, gamma, T1, P1, T3_max=None):
 
 
 def ts_traces(res, gamma):
-    """Return list of (s_array, T_array, label) for each phase."""
+    """Return list of (s_array, T_array, label) for each phase.
+
+    Entropy reference: s=0 at state 1.
+    Isentropic processes (1→2, 3→4) have ds=0.
+    Heat addition (2→3) and rejection (4→1) are computed from cv/cp·ln(T).
+    The 4→1 segment is forced to close back at s=0, T1 so the loop
+    is exact regardless of floating-point accumulation.
+    """
     cv, cp = res['cv'], res['cp']
-    T1,T2,T3,T4 = res['T1'],res['T2'],res['T3'],res['T4']
-    s2  = 0.0
-    s3  = s2 + cp * np.log(T3 / T2) / 1e3
-    s4  = s3
-    s1b = s4 + cv * np.log(T1 / T4) / 1e3
-    pts = [(0, T1, s2, T2, '1→2 Compress'),
-           (s2, T2, s3, T3, '2→3 Heat Add'),
-           (s3, T3, s4, T4, '3→4 Expand'),
-           (s4, T4, s1b, T1, '4→1 Heat Rej')]
+    T1, T2, T3, T4 = res['T1'], res['T2'], res['T3'], res['T4']
+
+    s1 = 0.0                                  # reference
+    s2 = s1                                   # 1→2 isentropic: ds = 0
+    s3 = s2 + cp * np.log(T3 / T2) / 1e3     # 2→3 heat addition
+    s4 = s3                                   # 3→4 isentropic: ds = 0
+    # 4→1 must close back to s1=0 exactly — force it rather than recompute
+    s1_close = s1
+
+    pts = [
+        (s1, T1, s2, T2, '1→2 Compress'),
+        (s2, T2, s3, T3, '2→3 Heat Add'),
+        (s3, T3, s4, T4, '3→4 Expand'),
+        (s4, T4, s1_close, T1, '4→1 Heat Rej'),
+    ]
     out = []
     for (sa, Ta, sb, Tb, label) in pts:
         ss = np.linspace(sa, sb, 40)
