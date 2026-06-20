@@ -291,7 +291,7 @@ def energy_figure(res, sl=None, show_ref=False):
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## ⚙️ Engine Cycle Simulator")
-    st.markdown("*1D Thermodynamic Analysis · UAV Propulsion Design*")
+    st.markdown("*1D Thermodynamic Analysis*")
     st.divider()
 
     cycle = st.radio("Cycle", ['Otto', 'Diesel', 'Brayton'], horizontal=True)
