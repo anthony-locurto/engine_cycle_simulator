@@ -391,6 +391,7 @@ st.divider()
 st.markdown(
     "<small>Ideal cycle analysis · ISA atmosphere model · "
     "Fixed peak temperature T₃ (materials/knock limit) — Q_in varies with altitude · "
-    "Built with Streamlit + Plotly</small>",
+    "Built with Streamlit + Plotly · "
+    "© 2026 Anthony LoCurto.  All Rights Reserved.</small>",
     unsafe_allow_html=True
 )
